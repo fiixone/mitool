@@ -1,0 +1,274 @@
+#!/system/bin/sh
+# ******************************************************
+# Copyright ©2021 All rights reserved.
+# Author       : FiixOne
+# Last modified: 2021-03-02 17:53
+# Email        : fiixone@163.com
+# Filename     : tool
+# Description  :
+# ******************************************************
+
+## Web环境配置
+_web_home="/sdcard/su/web/"
+_web_port="80"
+
+## Other
+_option=""
+_sh_path="/data/bin/"
+_faild="Faild"
+_success="Success"
+
+
+######################################
+##   菜单开始
+
+# 主菜单
+menu(){
+cat << EOF
+-------------------------------------------------------------
+|  _____ _ _       ___             _ _____          _       |
+| |  ___(_|_)_  __/ _ \ _ __   ___( )_   _|__  ___ | |___   |
+| | |_  | | \ \/ / | | | '_ \ / _ \\| | |/ _ \ / _ \| / __|  |
+| |  _| | | |>  <| |_| | | | |  __/  | | (_) | (_) | \__ \  |
+| |_|   |_|_/_/\_/\\___/|_| |_|\___|  |_|\___/ \___/|_|___/  |
+|                                                           |
+-------------------------------------------------------------
+| 1.WifiPassword/PublicIP   # 6.Add sh/*                    |
+| 2.Clean File/Folder       # 7.Start Web                   |
+| 3.Mount /system           # 8.                            |
+| 4.Overwrite hosts         # 9.                            |
+| 5.APP[list/rm/disable]    # 10.                           |
+-------------------------------------------------------------
+EOF
+echo -n "Enter Option,(Q/q)for Quit:"
+read _option
+
+case $_option in
+1) menu_1
+;;
+2) clean_dir
+;;
+3) mount_rw
+;;
+4) hosts
+;;
+5) menu_5
+;;
+6) link_sh
+;;
+7) start_web
+;;
+[qQ]) echo "Exit..." && exit
+;;
+*) echo "Option Error!" && menu
+;;
+esac
+}
+
+# 子菜单1
+menu_1(){
+cat << EOF
+-------------------------------------------------------------
+|  _____ _ _       ___             _ _____          _       |
+| |  ___(_|_)_  __/ _ \ _ __   ___( )_   _|__  ___ | |___   |
+| | |_  | | \ \/ / | | | '_ \ / _ \\| | |/ _ \ / _ \| / __|  |
+| |  _| | | |>  <| |_| | | | |  __/  | | (_) | (_) | \__ \  |
+| |_|   |_|_/_/\_/\\___/|_| |_|\___|  |_|\___/ \___/|_|___/  |
+|                                                           |
+-------------------------------------------------------------
+| 1.WifiPassword            #                               |
+| 2.PublicIP                #                               |
+-------------------------------------------------------------
+EOF
+echo -n "Enter Option:"
+read _option
+
+case $_option in
+1) wifi_pw
+;;
+2) public_ip
+;;
+*) echo "Back To The Menu!" && menu
+;;
+esac
+}
+
+# 子菜单5
+menu_5(){
+cat << EOF
+-------------------------------------------------------------
+|  _____ _ _       ___             _ _____          _       |
+| |  ___(_|_)_  __/ _ \ _ __   ___( )_   _|__  ___ | |___   |
+| | |_  | | \ \/ / | | | '_ \ / _ \\| | |/ _ \ / _ \| / __|  |
+| |  _| | | |>  <| |_| | | | |  __/  | | (_) | (_) | \__ \  |
+| |_|   |_|_/_/\_/\\___/|_| |_|\___|  |_|\___/ \___/|_|___/  |
+|                                                           |
+-------------------------------------------------------------
+| 1.APP[list]               #                               |
+| 2.APP[rm]                 #                               |
+| 3.APP[disable]            #                               |
+-------------------------------------------------------------
+EOF
+echo -n "Enter Option:"
+read _option
+
+case $_option in
+1) pm_list
+;;
+2) pm_remove
+;;
+3) pm_disable
+;;
+*) echo "Back To The Menu!" && menu
+;;
+esac
+}
+
+##   菜单结束
+######################################
+
+
+######################################
+##   自定义函数开始
+
+## WiFi密码
+wifi_pw(){
+
+    if [ -e "/data/misc/wifi/wpa_supplicant.conf" ]; then
+        echo "检测到WiFi配置文件"
+        cat /data/misc/wifi/wpa_supplicant.conf > /sdcard/su/wifi.pw && echo "WiFi密码导出完成"
+    elif [ -e "/data/misc/wifi/WifiConfigStore.xml" ]; then
+        echo "检测到WiFi配置文件"
+        grep -E \"SSID\|PreSharedKey /data/misc/wifi/WifiConfigStore.xml | \
+        sed -e 's/&quot;//g'  -e 's/<\/string>//g' -e 's/<string\ name="//g' -e 's/<null name\="//g' -e 's/SSID">/\nWiFi帐号:/g'  -e 's/PreSharedKey">/WiFi密码:/g'  -e 's/PreSharedKey" \/>/WiFi密码:/g' | \
+        tee /sdcard/su/wifi.pw && echo "WiFi密码导出完成"
+    else echo -e "\033[31mInfo:Wifi密码未找到!\033[0m"
+    fi
+    menu
+}
+
+## 公网IP
+public_ip(){
+    _faild="获取IP失败"
+    _success="获取IP成功"
+    curl ifconfig.cc -w '\n'
+    run_status
+    menu
+}
+
+## 文件/文件夹清理
+clean_dir(){
+    _success="文件/文件夹清理成功"
+    cd /sdcard/ || exit
+    if [ -e "/sdcard/su/dir_clean.list" ]; then
+        echo "开始清理..."
+        for dir in $(cat /sdcard/su/dir_clean.list)
+        do
+        echo "文件/文件夹[$dir]正在清理..."
+        rm -rf "./$dir"
+        done
+        run_status
+    else echo "未检测到 dir_clean.list 配置文件!" & return 1
+    fi
+    menu
+}
+
+## Hosts 修改查看
+hosts(){
+    _faild="hosts覆盖失败,请检查system分区是否可写"
+    _success="hosts覆盖成功"
+    cp /sdcard/su/hosts /system/etc/ >/dev/null 2>&1
+    run_status
+    cat /system/etc/hosts
+    menu
+}
+
+## 挂载分区rw
+
+mount_rw(){
+    _faild="system分区挂载失败,请检查是否解除验证(adb root && adb disable-verity)"
+    _success="system分区挂载成功"
+    mount -o remount,rw /system
+    run_status
+    menu
+}
+
+## 查看所有安装包
+pm_list(){
+    _faild="app列表导出失败"
+    _success="app列表导出成功"
+    echo $(pm list packages) > /sdcard/su/app_all.list  && run_status
+    cd /sdcard/su/ || exit
+    sed -i 's/package://g' app_all.list
+    sed -i 's/ /\n/g' app_all.list
+    echo "app列表优化完成"
+    menu
+}
+
+## 停用自定义应用
+pm_disable(){
+    _success="app停用完成"
+    for pmapp in $(grep -E "^(com|cn|org)" /sdcard/su/app_disable.list)
+    do
+    pm disable "$pmapp"
+    done
+    run_status
+    menu
+}
+
+## 移除自定义应用
+pm_remove(){
+    if [ ! -d "/sdcard/su/backup" ]; then mkdir -p /sdcard/su/backup;fi
+    for app in $(grep -E "^(com|cn|org)" /sdcard/su/app_remove.list)
+    do
+    echo "处理应用[ $app ]中..."
+    _app_path=$(pm path "$app" |sed 's/package://g'|sed 's/\/[^/]*$//')
+    mv "$_app_path" /sdcard/su/backup/  >/dev/null 2>&1
+    run_status
+    # rm -rf "$_app_path"
+    echo "应用名称:$app" >> /sdcard/su/backup/app.path
+    echo "应用位置$_app_path" >> /sdcard/su/backup/app.path
+    done
+    menu
+}
+
+## 脚本复制
+link_sh(){
+    cd /sdcard/su/sh/ || exit
+    if [ ! -d "$_sh_path" ];
+    then mkdir -p "$_sh_path" && chmod 777  "$_sh_path"/*
+    fi
+    for sh_file in  /sdcard/su/sh/*
+    do
+    cp "$sh_file" $_sh_path/ && chmod +x "$_sh_path"/* && echo "文件[$sh_file]已复制到[$_sh_path].."
+    done
+    menu
+}
+
+## 启动 Web 服务
+start_web(){
+    if [ $(command -v httpd) ]; then
+        echo "成功检测到httpd...等待"
+        if [ ! -d "$_web_home" ];
+        then mkdir -p "$_web_home" && echo -e "\033[32mInfo:Web目录创建成功!\033[0m";
+        fi
+        httpd -p $_web_port -h $_web_home  && echo "Web服务已启动,目录:[$_web_home],端口:[$_web_port]..."
+        run_status
+    else
+        echo "未检测到httpd,请查询是否安装BusyBox!"
+    fi
+    menu
+}
+
+## 运行状态
+run_status(){
+    if [ $? -ne 0 ]; then
+    echo -e "\033[31mInfo:$_faild \033[0m"
+    else
+    echo -e "\033[32mInfo:$_success \033[0m"
+    fi
+}
+
+##   自定义函数结束
+######################################
+menu
